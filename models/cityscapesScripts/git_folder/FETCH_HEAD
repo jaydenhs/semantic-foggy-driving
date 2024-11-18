@@ -1,0 +1,6 @@
+5d3ad48726f28d07b5771509be113dd1bed9cb08		branch 'master' of https://github.com/mcordts/cityscapesScripts
+0eea9d77d4aff5e3791f4e55e9dc34221d6f6347	not-for-merge	branch 'bugfix/bev_depth_calculation' of https://github.com/mcordts/cityscapesScripts
+41ae638383a414f87e70a0e35fd446bf98f10581	not-for-merge	branch 'bugfix/save_result_file' of https://github.com/mcordts/cityscapesScripts
+099c18d3cb2a57797fe580765d7686c260da6268	not-for-merge	branch 'feature/csPlot3dDetectionResults' of https://github.com/mcordts/cityscapesScripts
+b112d00bd3cafce91e8b7584d66e2324f7f01556	not-for-merge	branch 'feature/print_results_like_eval' of https://github.com/mcordts/cityscapesScripts
+594dc83db49b6d61145316879ac5eba79cdc9314	not-for-merge	branch 'plot_3d_results_adjustments' of https://github.com/mcordts/cityscapesScripts
