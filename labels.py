@@ -55,6 +55,26 @@ Label = namedtuple( 'Label' , [
 # Make sure to provide your results using the original IDs and not the training IDs.
 # Note that many IDs are ignored in evaluation and thus you never need to predict these!
 
+# Function to map id to trainId considering ignoreInEval
+def map_id_to_trainId(image):
+    # Create a mapping from id to trainId considering ignoreInEval
+    mapping = {label.id: (label.trainId if not label.ignoreInEval else 255) for label in labels}
+
+    # Create an output array of the same shape as the input image
+    mapped_image = np.copy(image)
+    
+    # For each unique value in the image, replace it with its corresponding trainId
+    for unique_id in np.unique(image):
+        mapped_image[image == unique_id] = mapping.get(unique_id, 255)  # Default to -1 if id is not found in mapping
+    
+    return mapped_image
+
+def map_trainId_to_label_name(trainId):
+    if trainId == 255 or trainId == -1:
+        return "Ignored in Training"
+    trainId_to_name = {label.trainId: label.name for label in labels}
+    return trainId_to_name.get(trainId, "Unknown")
+
 labels = [
     #       name                     id    trainId   category            catId     hasInstances   ignoreInEval   color
     Label(  'unlabeled'            ,  0 ,      255 , 'void'            , 0       , False        , True         , (  0,  0,  0) ),
@@ -93,17 +113,3 @@ labels = [
     Label(  'bicycle'              , 33 ,       18 , 'vehicle'         , 7       , True         , False        , (119, 11, 32) ),
     Label(  'license plate'        , -1 ,       -1 , 'vehicle'         , 7       , False        , True         , (  0,  0,142) ),
 ]
-
-# Function to map id to trainId
-def map_id_to_trainId(image):
-    # Create a mapping from id to trainId
-    mapping = {label.id: label.trainId for label in labels}
-
-    # Create an output array of the same shape as the input image
-    mapped_image = np.copy(image)
-    
-    # For each unique value in the image, replace it with its corresponding trainId
-    for unique_id in np.unique(image):
-        mapped_image[image == unique_id] = mapping.get(unique_id, 255)  # Default to 255 if id is not found in mapping
-    
-    return mapped_image
