@@ -3,9 +3,9 @@ import shutil
 from tqdm import tqdm
 
 def split_dataset():
-    root_path = r".\data"
-    input_path = r"leftImg8bit_trainvaltest_foggy\leftImg8bit_foggy"
-    target_path = r"gtFine_trainvaltest\gtFine"
+    root_path = r"./data"
+    input_path = r"leftImg8bit_trainvaltest_foggy/leftImg8bit_foggy"
+    target_path = r"gtFine_trainvaltest/gtFine"
     input_beta = 0.01
 
     city_to_split = {
