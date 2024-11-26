@@ -26,7 +26,7 @@ config = dict(
     lr_gamma=0.1,
     log_freq=8,
     root_path=r"./data_split",
-    num_classes=30
+    num_classes=19
 )
 
 # Set random seeds
