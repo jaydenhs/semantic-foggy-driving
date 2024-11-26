@@ -4,9 +4,9 @@ import torch
 import wandb
 import random
 from tqdm.auto import tqdm
-from sklearn.metrics import jaccard_score
 from models.unet import UNet
 from dataset import get_data, make_dataloader
+from metrics import calculate_mIoU
 
 # Set random seeds
 torch.backends.cudnn.deterministic = True
@@ -63,19 +63,6 @@ def evaluate_model(model, test_loader):
             pbar.set_postfix({"mIoU": mIoU})
     avg_mIoU = total_mIoU / len(test_loader)
     return avg_mIoU
-
-def calculate_mIoU(outputs, labels):
-    """
-    Calculates the mean Intersection over Union (mIoU) metric.
-    """
-    outputs = torch.argmax(outputs, dim=1).cpu().numpy()
-    labels = labels.cpu().numpy()
-    mask = labels != 255
-    outputs = outputs[mask]
-    labels = labels[mask]
-    mIoU = jaccard_score(labels.flatten(), outputs.flatten(), average="weighted")
-    return mIoU
-
 
 if __name__ == "__main__":
     artifact_name = "syde-577/semantic-foggy-driving/UNet_ep_1_img_64x128_bs_64_channels_8_mIoU_0.45:latest"  # Replace with your artifact name

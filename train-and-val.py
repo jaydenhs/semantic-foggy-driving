@@ -1,17 +1,17 @@
+import os
 import numpy as np
 import torch
 import wandb
 import random
 from tqdm.auto import tqdm
 import torch.nn as nn
-from sklearn.metrics import jaccard_score
 from torch.utils.data import Subset
 from torch.optim.lr_scheduler import StepLR
 
 from models.unet import UNet
 from dataset import get_data, make_dataloader
 from labels import map_trainId_to_label_name
-import os
+from metrics import calculate_mIoU
 
 config = dict(
     architecture="UNet",
@@ -183,18 +183,6 @@ def validate(model, loader, criterion, config, epoch):
     })
 
     return avg_mIoU
-
-def calculate_mIoU(outputs, labels):
-    outputs = torch.argmax(outputs, dim=1).cpu().numpy()
-    labels = labels.cpu().numpy()
-    
-    mask = labels != 255
-    
-    outputs = outputs[mask]
-    labels = labels[mask]
-    
-    mIoU = jaccard_score(labels.flatten(), outputs.flatten(), average='weighted')
-    return mIoU
 
 def log_sample(input, input_name, label, output, split):
     input_img = input.permute(1, 2, 0).detach().cpu().numpy()
