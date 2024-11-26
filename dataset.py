@@ -105,3 +105,33 @@ def make_dataloader(dataset, batch_size, shuffle):
                                          batch_size=batch_size, 
                                          shuffle=shuffle, pin_memory=True)
     return loader
+
+def print_image_counts(split):
+    root_path = r".\data_split"
+    INPUT_PATH = r"leftImg8bit_trainvaltest_foggy\leftImg8bit_foggy"
+    TARGET_PATH = r"gtFine_trainvaltest\gtFine"
+    input_beta = 0.01
+
+    input_split_path = os.path.join(root_path, INPUT_PATH, split)
+    target_split_path = os.path.join(root_path, TARGET_PATH, split)
+
+    total_images = 0
+    print(f"Image counts for split: {split}")
+
+    for city_name in os.listdir(input_split_path):
+        city_input_path = os.path.join(input_split_path, city_name)
+        city_target_path = os.path.join(target_split_path, city_name)
+
+        input_image_count = len([name for name in os.listdir(city_input_path) if str(input_beta) in name])
+        target_image_count = len([name for name in os.listdir(city_target_path) if "labelId" in name])
+
+        total_images += input_image_count
+
+        print(f"City: {city_name}, Input images: {input_image_count}, Target images: {target_image_count}")
+
+    print(f"TOTAL IMAGES: {total_images}")
+
+if __name__ == "__main__":
+    print_image_counts('train')
+    print_image_counts('val')
+    print_image_counts('test')

@@ -15,16 +15,16 @@ import os
 
 config = dict(
     architecture="UNet",
-    base_channels = 64,
+    base_channels = 32,
     batch_size = 4,
-    epochs = 20,
+    epochs = 10,
     image_size = (512, 1024),
     input_beta = 0.01,
     lr = 0.001,
     lr_step_size = 2,
     lr_gamma = 0.1,
     log_freq = 8,
-    root_path = r"C:\Users\Jayden Hsiao\Documents\Grad School\02 - Fall 2024\SYDE 577\semantic-foggy-driving\data"
+    root_path = r".\data_split"
 )
 
 # Set random seeds

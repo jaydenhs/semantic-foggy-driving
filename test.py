@@ -78,7 +78,7 @@ def calculate_mIoU(outputs, labels):
 
 
 if __name__ == "__main__":
-    artifact_name = "syde-577/semantic-foggy-driving/UNet_ep_3_img_128x256_bs_4_channels_32_mIoU_0.41:latest"  # Replace with your artifact name
+    artifact_name = "syde-577/semantic-foggy-driving/UNet_ep_1_img_64x128_bs_64_channels_8_mIoU_0.45:latest"  # Replace with your artifact name
     wandb.init(project="semantic-foggy-driving", job_type="test")
 
     # Load model and configuration
