@@ -22,7 +22,10 @@ except ImportError:
 
 
 logger = logging.getLogger(__name__)
-
+# BETA = 0.005
+# BETA = 0.01
+BETA = 0.02
+FOGGY_ON = True
 
 def _get_cityscapes_files(image_dir, gt_dir):
     files = []
@@ -49,6 +52,40 @@ def _get_cityscapes_files(image_dir, gt_dir):
         assert PathManager.isfile(f), f
     return files
 
+def _get_foggy_cityscapes_files(image_dir, gt_dir, beta):
+    files = []
+    suffix = f"leftImg8bit_foggy_beta_{beta}.png"
+
+    image_dir = image_dir.replace("cityscapes", "cityscapes_foggy")
+    
+    # scan through the directory
+    cities = PathManager.ls(image_dir)
+    logger.info(f"{len(cities)} cities found in '{image_dir}'.")
+    
+    for city in cities:
+        city_img_dir = os.path.join(image_dir, city)
+        city_gt_dir = os.path.join(gt_dir, city)
+        
+        for basename in PathManager.ls(city_img_dir):
+            # Only process images that match the selected beta
+            if not basename.endswith(suffix):
+                continue
+            
+            image_file = os.path.join(city_img_dir, basename)
+            basename = basename[: -len(suffix)]
+
+            instance_file = os.path.join(city_gt_dir, basename + "gtFine_instanceIds.png")
+            label_file = os.path.join(city_gt_dir, basename + "gtFine_labelIds.png")
+            json_file = os.path.join(city_gt_dir, basename + "gtFine_polygons.json")
+
+            files.append((image_file, instance_file, label_file, json_file))
+    
+    assert len(files), "No images found in {}".format(image_dir)
+    for f in files[0]:
+        assert PathManager.isfile(f), f
+    
+    return files
+
 
 def load_cityscapes_instances(image_dir, gt_dir, from_json=True, to_polygons=True):
     """
@@ -68,7 +105,11 @@ def load_cityscapes_instances(image_dir, gt_dir, from_json=True, to_polygons=Tru
             "Cityscapes's json annotations are in polygon format. "
             "Converting to mask format is not supported now."
         )
-    files = _get_cityscapes_files(image_dir, gt_dir)
+    
+    if FOGGY_ON:
+        files = _get_foggy_cityscapes_files(image_dir, gt_dir, BETA)
+    else:
+        files = _get_cityscapes_files(image_dir, gt_dir)
 
     logger.info("Preprocessing cityscapes annotations ...")
     # This is still not fast: all workers will execute duplicate works and will
@@ -105,7 +146,14 @@ def load_cityscapes_semantic(image_dir, gt_dir):
     ret = []
     # gt_dir is small and contain many small files. make sense to fetch to local first
     gt_dir = PathManager.get_local_path(gt_dir)
-    for image_file, _, label_file, json_file in _get_cityscapes_files(image_dir, gt_dir):
+
+    if FOGGY_ON:
+        files = _get_foggy_cityscapes_files(image_dir, gt_dir, BETA)
+    else:
+        files = _get_cityscapes_files(image_dir, gt_dir)
+
+    for image_file, _, label_file, json_file in files:
+    # for image_file, _, label_file, json_file in _get_foggy_cityscapes_files(image_dir, gt_dir, BETA):
         label_file = label_file.replace("labelIds", "labelTrainIds")
 
         with PathManager.open(json_file, "r") as f:
