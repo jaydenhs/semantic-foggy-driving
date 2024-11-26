@@ -10,8 +10,7 @@ from torch.optim.lr_scheduler import StepLR
 
 from models.unet import UNet
 from dataset import get_data, make_dataloader
-from labels import map_trainId_to_label_name
-from metrics import calculate_mIoU
+from utils import calculate_mIoU, log_sample
 
 config = dict(
     architecture="UNet",
@@ -183,29 +182,6 @@ def validate(model, loader, criterion, config, epoch):
     })
 
     return avg_mIoU
-
-def log_sample(input, input_name, label, output, split):
-    input_img = input.permute(1, 2, 0).detach().cpu().numpy()
-    label_img = label.detach().cpu().numpy()
-    output_img = output.detach().cpu()
-    
-    output_img = torch.argmax(output_img, dim=0).numpy()
-
-    wandb.log({
-        f"{split}/input_image": wandb.Image(input_img, caption=f"Input Image: {input_name}"),
-        f"{split}/label_image": wandb.Image(label_img, caption="Label Image", masks={
-            "predictions": {
-                "mask_data": label_img,
-                "class_labels": {k: map_trainId_to_label_name(k) for k in np.unique(label_img)}
-            }
-        }),
-        f"{split}/output_image": wandb.Image(output_img, caption="Output Image", masks={
-            "predictions": {
-                "mask_data": output_img,
-                "class_labels": {k: map_trainId_to_label_name(k) for k in np.unique(output_img)}
-            }
-        })
-    })
 
 if __name__ == "__main__":
     model_pipeline(config)

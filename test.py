@@ -6,7 +6,7 @@ import random
 from tqdm.auto import tqdm
 from models.unet import UNet
 from dataset import get_data, make_dataloader
-from metrics import calculate_mIoU
+from utils import calculate_mIoU, log_sample
 
 # Set random seeds
 torch.backends.cudnn.deterministic = True
@@ -53,25 +53,43 @@ def evaluate_model(model, test_loader):
     total_mIoU = 0
     with torch.no_grad():
         pbar = tqdm(test_loader, desc="Evaluating")
-        for sample in pbar:
+        for batch, sample in enumerate(pbar):
             inputs = sample["input_image"].permute(0, 3, 1, 2).to(device)
+            input_names = sample["input_name"]
             labels = sample["target_image"].to(device)
             outputs = model(inputs)
             mIoU = calculate_mIoU(outputs, labels)
             total_mIoU += mIoU
 
             pbar.set_postfix({"mIoU": mIoU})
+
+            if mIoU < 0.5:
+                wandb.log({
+                    "test/batch_num": batch,
+                    "test/mIoU": mIoU,
+                })
+                log_sample(inputs[0], input_names[0], labels[0], outputs[0], split='test/lt0.5')
+            elif mIoU > 0.8:
+                wandb.log({
+                    "test/batch_num": batch,
+                    "test/mIoU": mIoU,
+                })
+                log_sample(inputs[0], input_names[0], labels[0], outputs[0], split='test/gt0.8')
+                
     avg_mIoU = total_mIoU / len(test_loader)
     return avg_mIoU
 
 if __name__ == "__main__":
-    artifact_name = "syde-577/semantic-foggy-driving/UNet_ep_1_img_64x128_bs_64_channels_8_mIoU_0.45:latest"  # Replace with your artifact name
-    wandb.init(project="semantic-foggy-driving", job_type="test")
+    artifact_name = "syde-577/semantic-foggy-driving/UNet_ep_10_img_512x1024_bs_4_channels_32_mIoU_0.75:latest"  # Replace with your artifact name
+    wandb.init(project="semantic-foggy-driving", name=artifact_name, job_type="test")
 
     # Load model and configuration
     model, config = load_model_and_config(artifact_name, UNet, device)
     wandb.config.update(config)
     config = wandb.config
+
+    wandb.define_metric("test/batch_num")
+    wandb.define_metric("test/*", step_metric="test/batch_num")
 
     # Load the test dataset
     test_data = get_data(config, split="test")
