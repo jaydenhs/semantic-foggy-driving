@@ -85,16 +85,16 @@ class FoggyCityscapesDataset(torch.utils.data.Dataset):
         # Create the sample dictionary
         sample = {
             'input_image': input_image,
-            'input_name': input_path.split("\\")[-1],
+            'input_name': input_path.split("//")[-1],
             'target_image': target_image,
-            'target_name': target_path.split("\\")[-1]
+            'target_name': target_path.split("//")[-1]
         }
 
         return sample    
     
 def get_data(config, split):
-    INPUT_PATH = r"leftImg8bit_trainvaltest_foggy\leftImg8bit_foggy"
-    TARGET_PATH = r"gtFine_trainvaltest\gtFine"
+    INPUT_PATH = r"leftImg8bit_trainvaltest_foggy/leftImg8bit_foggy"
+    TARGET_PATH = r"gtFine_trainvaltest/gtFine"
 
     dataset = FoggyCityscapesDataset(input=INPUT_PATH, target=TARGET_PATH, split=split, config=config)
     
@@ -107,9 +107,9 @@ def make_dataloader(dataset, batch_size, shuffle):
     return loader
 
 def print_image_counts(split):
-    root_path = r".\data_split"
-    INPUT_PATH = r"leftImg8bit_trainvaltest_foggy\leftImg8bit_foggy"
-    TARGET_PATH = r"gtFine_trainvaltest\gtFine"
+    root_path = r"./data_split"
+    INPUT_PATH = r"leftImg8bit_trainvaltest_foggy/leftImg8bit_foggy"
+    TARGET_PATH = r"gtFine_trainvaltest/gtFine"
     input_beta = 0.01
 
     input_split_path = os.path.join(root_path, INPUT_PATH, split)

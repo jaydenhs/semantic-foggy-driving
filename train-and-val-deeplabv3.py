@@ -15,17 +15,18 @@ from labels import map_trainId_to_label_name
 from metrics import calculate_mIoU
 
 config = dict(
-    architecture="UNet",
-    base_channels = 32,
-    batch_size = 4,
-    epochs = 10,
-    image_size = (512, 1024),
-    input_beta = 0.01,
-    lr = 0.001,
-    lr_step_size = 2,
-    lr_gamma = 0.1,
-    log_freq = 8,
-    root_path = r"./data_split"
+    architecture="DeepLabv3",
+    base_channels=32,
+    batch_size=4,
+    epochs=10,
+    image_size=(512, 1024),
+    input_beta=0.01,
+    lr=0.001,
+    lr_step_size=2,
+    lr_gamma=0.1,
+    log_freq=8,
+    root_path=r"./data_split",
+    num_classes=30
 )
 
 # Set random seeds
@@ -83,7 +84,6 @@ def model_pipeline(config):
 
 def make(config):
     train, val = get_data(config, split="train"), get_data(config, split="val")
-    
     # For quick debugging
     train_subset = Subset(train, range(len(train)))
     val_subset = Subset(val, range(len(val)))
@@ -91,7 +91,9 @@ def make(config):
     train_loader = make_dataloader(train_subset, batch_size=config.batch_size, shuffle=True)
     val_loader = make_dataloader(val_subset, batch_size=config.batch_size, shuffle=False)
 
-    model = UNet(in_channels=3, num_classes=19, base_channels=config.base_channels).to(device)
+    model = deeplabv3_resnet50(pretrained=False)
+    model.classifier[4] = nn.Conv2d(256, config.num_classes, kernel_size=(1, 1), stride=(1, 1))
+    model = model.to(device)
 
     criterion = nn.CrossEntropyLoss(ignore_index=255)
     optimizer = torch.optim.Adam(
@@ -120,7 +122,7 @@ def train(model, loader, criterion, optimizer, scheduler, config, epoch):
         optimizer.zero_grad() 
 
         outputs = model(inputs)  
-        loss = criterion(outputs, labels)  
+        loss = criterion(outputs["out"], labels) 
         loss.backward() 
 
         optimizer.step() 
@@ -128,7 +130,7 @@ def train(model, loader, criterion, optimizer, scheduler, config, epoch):
         total_loss += loss.item()
         example_ct += len(inputs)
 
-        mIoU = calculate_mIoU(outputs, labels)
+        mIoU = calculate_mIoU(outputs["out"], labels)
         pbar.set_postfix(loss=loss.item(), mIoU=mIoU)
         total_mIoU += mIoU
 
@@ -140,7 +142,7 @@ def train(model, loader, criterion, optimizer, scheduler, config, epoch):
                 "train/mIoU": mIoU,
                 "train/learning_rate": scheduler.get_last_lr()[0]
             })
-            log_sample(inputs[0], input_names[0], labels[0], outputs[0], split='train')
+            log_sample(inputs[0], input_names[0], labels[0], outputs["out"], split='train')
     
     scheduler.step()
 
@@ -161,18 +163,18 @@ def validate(model, loader, criterion, config, epoch):
             labels = labels.to(device)
 
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs["out"], labels)
             
             total_loss += loss.item()
             example_ct += len(inputs)
 
-            mIoU = calculate_mIoU(outputs, labels)
+            mIoU = calculate_mIoU(outputs["out"], labels)
             total_mIoU += mIoU
             
             pbar.set_postfix(loss=loss.item(), mIoU=mIoU)
 
             if batch % config.log_freq == 0:
-                log_sample(inputs[0], input_names[0], labels[0], outputs[0], split='val')
+                log_sample(inputs[0], input_names[0], labels[0], outputs["out"], split='val')
 
     avg_loss = total_loss / len(loader)
     avg_mIoU = total_mIoU / len(loader)
@@ -189,13 +191,15 @@ def log_sample(input, input_name, label, output, split):
     input_img = input.permute(1, 2, 0).detach().cpu().numpy()
     label_img = label.detach().cpu().numpy()
     output_img = output.detach().cpu()
-    
-    output_img = torch.argmax(output_img, dim=0).numpy()
+    print(output_img.shape)
 
-    wandb.log({
-        f"{split}/input_image": wandb.Image(input_img, caption=f"Input Image: {input_name}"),
+    output_img = torch.argmax(output, dim=1)[0].detach().cpu().numpy()
+    print(output_img.shape)
+
+    wandb_log_data = {
+        f"{split}/input_image": wandb.Image(input_img, caption=f"Input Image: {input_name}" if input_name else "Input Image"),
         f"{split}/label_image": wandb.Image(label_img, caption="Label Image", masks={
-            "predictions": {
+            "ground_truth": {
                 "mask_data": label_img,
                 "class_labels": {k: map_trainId_to_label_name(k) for k in np.unique(label_img)}
             }
@@ -206,7 +210,8 @@ def log_sample(input, input_name, label, output, split):
                 "class_labels": {k: map_trainId_to_label_name(k) for k in np.unique(output_img)}
             }
         })
-    })
+    }
+    wandb.log(wandb_log_data)
 
 if __name__ == "__main__":
     model_pipeline(config)
