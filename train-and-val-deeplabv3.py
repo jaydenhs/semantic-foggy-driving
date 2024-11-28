@@ -5,6 +5,7 @@ import wandb
 import random
 from tqdm.auto import tqdm
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.utils.data import Subset
 from torch.optim.lr_scheduler import StepLR
 from torchvision.models.segmentation import deeplabv3_resnet50
@@ -28,6 +29,47 @@ config = dict(
     root_path=r"./data_split",
     num_classes=19
 )
+
+class DiceLoss(nn.Module):
+    def __init__(self, smooth=1.0, ignore_index=None):
+        super(DiceLoss, self).__init__()
+        self.smooth = smooth
+        self.ignore_index = ignore_index
+
+    def forward(self, preds, targets):
+        # Apply softmax to the predictions (if logits)
+        preds = F.softmax(preds, dim=1)
+        
+        num_classes = preds.size(1)
+        
+        # Create a mask for valid targets
+        valid_mask = (targets != self.ignore_index)
+        
+        # Replace ignore_index values with a valid class index (e.g., 0)
+        targets_temp = targets.clone()
+        targets_temp[~valid_mask] = 0
+        
+        # One-hot encode the target
+        targets_one_hot = F.one_hot(targets_temp, num_classes=num_classes).permute(0, 3, 1, 2).float()
+        
+        # Apply the valid mask to the one-hot targets
+        targets_one_hot = targets_one_hot * valid_mask.unsqueeze(1).float()
+        
+        # Flatten the tensors for computation
+        preds = preds.contiguous().view(preds.size(0), preds.size(1), -1)
+        targets_one_hot = targets_one_hot.contiguous().view(targets_one_hot.size(0), targets_one_hot.size(1), -1)
+        
+        # Compute the intersection and union
+        intersection = (preds * targets_one_hot).sum(dim=2)
+        cardinality = preds.sum(dim=2) + targets_one_hot.sum(dim=2)
+        
+        # Compute the Dice Score
+        dice_score = (2. * intersection + self.smooth) / (cardinality + self.smooth)
+        
+        # Return the Dice Loss (1 - mean Dice Score)
+        return 1 - dice_score.mean()
+
+
 
 # Set random seeds
 torch.backends.cudnn.deterministic = True
@@ -95,7 +137,7 @@ def make(config):
     model.classifier[4] = nn.Conv2d(256, config.num_classes, kernel_size=(1, 1), stride=(1, 1))
     model = model.to(device)
 
-    criterion = nn.CrossEntropyLoss(ignore_index=255)
+    criterion = DiceLoss(ignore_index=255)
     optimizer = torch.optim.Adam(
         model.parameters(), lr=config.lr)
     
@@ -191,10 +233,8 @@ def log_sample(input, input_name, label, output, split):
     input_img = input.permute(1, 2, 0).detach().cpu().numpy()
     label_img = label.detach().cpu().numpy()
     output_img = output.detach().cpu()
-    print(output_img.shape)
 
     output_img = torch.argmax(output, dim=1)[0].detach().cpu().numpy()
-    print(output_img.shape)
 
     wandb_log_data = {
         f"{split}/input_image": wandb.Image(input_img, caption=f"Input Image: {input_name}" if input_name else "Input Image"),
