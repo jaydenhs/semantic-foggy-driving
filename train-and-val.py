@@ -14,10 +14,10 @@ from utils import calculate_mIoU, log_sample
 
 config = dict(
     architecture="UNet",
-    base_channels = 32,
-    batch_size = 4,
+    base_channels = 64,
+    batch_size = 1,
     epochs = 10,
-    image_size = (512, 1024),
+    image_size = (1024, 2048),
     input_beta = 0.01,
     lr = 0.001,
     lr_step_size = 2,
