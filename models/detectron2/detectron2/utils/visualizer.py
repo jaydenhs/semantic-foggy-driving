@@ -17,6 +17,8 @@ from detectron2.data import MetadataCatalog
 from detectron2.structures import BitMasks, Boxes, BoxMode, Keypoints, PolygonMasks, RotatedBoxes
 from detectron2.utils.file_io import PathManager
 
+from cityscapesscripts.helpers.labels import trainId2label
+
 from .colormap import random_color
 
 logger = logging.getLogger(__name__)
@@ -465,12 +467,17 @@ class Visualizer:
         labels = labels[sorted_idxs]
         for label in filter(lambda l: l < len(self.metadata.stuff_classes), labels):
             try:
-                mask_color = [x / 255 for x in self.metadata.stuff_colors[label]]
+                label_info = trainId2label[label]
+                color = label_info.color
+                mask_color = [c / 255.0 for c in color]  # Normalize color
+                # mask_color = [x / 255 for x in self.metadata.stuff_colors[label]]
             except (AttributeError, IndexError):
                 mask_color = None
 
             binary_mask = (sem_seg == label).astype(np.uint8)
             text = self.metadata.stuff_classes[label]
+            # print("text:", text, "| color:", mask_color)
+
             self.draw_binary_mask(
                 binary_mask,
                 color=mask_color,
