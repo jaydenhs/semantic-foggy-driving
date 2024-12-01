@@ -17,10 +17,10 @@ from metrics import calculate_mIoU
 
 config = dict(
     architecture="DeepLabv3",
-    base_channels=32,
+    base_channels=64,
     batch_size=4,
     epochs=10,
-    image_size=(512, 1024),
+    image_size=(1024, 2048),
     input_beta=0.01,
     lr=0.001,
     lr_step_size=2,
