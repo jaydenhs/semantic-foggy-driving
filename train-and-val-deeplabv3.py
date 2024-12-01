@@ -8,7 +8,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Subset
 from torch.optim.lr_scheduler import StepLR
-from torchvision.models.segmentation import deeplabv3_resnet50
+from torchvision.models.segmentation import deeplabv3_resnet101
 
 from models.unet import UNet
 from dataset import get_data, make_dataloader
@@ -37,38 +37,42 @@ class DiceLoss(nn.Module):
         self.ignore_index = ignore_index
 
     def forward(self, preds, targets):
-        # Apply softmax to the predictions (if logits)
         preds = F.softmax(preds, dim=1)
         
         num_classes = preds.size(1)
         
-        # Create a mask for valid targets
         valid_mask = (targets != self.ignore_index)
         
-        # Replace ignore_index values with a valid class index (e.g., 0)
         targets_temp = targets.clone()
         targets_temp[~valid_mask] = 0
         
-        # One-hot encode the target
         targets_one_hot = F.one_hot(targets_temp, num_classes=num_classes).permute(0, 3, 1, 2).float()
         
-        # Apply the valid mask to the one-hot targets
         targets_one_hot = targets_one_hot * valid_mask.unsqueeze(1).float()
         
-        # Flatten the tensors for computation
         preds = preds.contiguous().view(preds.size(0), preds.size(1), -1)
         targets_one_hot = targets_one_hot.contiguous().view(targets_one_hot.size(0), targets_one_hot.size(1), -1)
         
-        # Compute the intersection and union
         intersection = (preds * targets_one_hot).sum(dim=2)
         cardinality = preds.sum(dim=2) + targets_one_hot.sum(dim=2)
         
-        # Compute the Dice Score
         dice_score = (2. * intersection + self.smooth) / (cardinality + self.smooth)
         
-        # Return the Dice Loss (1 - mean Dice Score)
         return 1 - dice_score.mean()
+    
+class CombinedLoss(nn.Module):
+    def __init__(self, dice_smooth=1.0, ignore_index=None, weight_ce=0.5, weight_dice=0.5):
+        super(CombinedLoss, self).__init__()
+        self.dice_loss = DiceLoss(smooth=dice_smooth, ignore_index=ignore_index)
+        self.ce_loss = nn.CrossEntropyLoss(ignore_index=ignore_index)
+        self.weight_ce = weight_ce
+        self.weight_dice = weight_dice
 
+    def forward(self, preds, targets):
+        ce_loss = self.ce_loss(preds, targets)
+        dice_loss = self.dice_loss(preds, targets)
+        combined_loss = self.weight_ce * ce_loss + self.weight_dice * dice_loss
+        return combined_loss
 
 
 # Set random seeds
@@ -133,11 +137,11 @@ def make(config):
     train_loader = make_dataloader(train_subset, batch_size=config.batch_size, shuffle=True)
     val_loader = make_dataloader(val_subset, batch_size=config.batch_size, shuffle=False)
 
-    model = deeplabv3_resnet50(pretrained=False)
+    model = deeplabv3_resnet101(pretrained=True)
     model.classifier[4] = nn.Conv2d(256, config.num_classes, kernel_size=(1, 1), stride=(1, 1))
     model = model.to(device)
 
-    criterion = DiceLoss(ignore_index=255)
+    criterion = CombinedLoss(ignore_index=255)
     optimizer = torch.optim.Adam(
         model.parameters(), lr=config.lr)
     
