@@ -14,8 +14,8 @@ from utils import calculate_mIoU, log_sample
 
 config = dict(
     architecture="UNet",
-    base_channels = 64,
-    batch_size = 1,
+    base_channels = 32,
+    batch_size = 2,
     epochs = 10,
     image_size = (1024, 2048),
     input_beta = 0.01,
@@ -25,6 +25,20 @@ config = dict(
     log_freq = 8,
     root_path = r".\data_split"
 )
+
+# config = dict(
+#     architecture="UNet",
+#     base_channels = 16,
+#     batch_size = 64,
+#     epochs = 3,
+#     image_size = (1024/8, 2048/8),
+#     input_beta = 0.01,
+#     lr = 0.001,
+#     lr_step_size = 2,
+#     lr_gamma = 0.1,
+#     log_freq = 8,
+#     root_path = r".\data_split"
+# )
 
 # Set random seeds
 torch.backends.cudnn.deterministic = True
@@ -54,30 +68,40 @@ def model_pipeline(config):
 
         best_val_mIoU = float('-inf')
         best_model_state = None
-        for epoch in range(config.epochs):
-            train(model, train_loader, criterion, optimizer, scheduler, config, epoch)
-            val_mIoU = validate(model, val_loader, criterion, config, epoch)
 
-            if val_mIoU > best_val_mIoU:
-                best_val_mIoU = val_mIoU
-                print(f"New best model found with val mIoU: {best_val_mIoU}")
-                best_model_state = model.state_dict()
+        try:
+            for epoch in range(config.epochs):
+                train(model, train_loader, criterion, optimizer, scheduler, config, epoch)
+                val_mIoU = validate(model, val_loader, criterion, config, epoch)
+
+                if val_mIoU > best_val_mIoU:
+                    best_val_mIoU = val_mIoU
+                    print(f"New best model found with val mIoU: {best_val_mIoU}")
+                    best_model_state = model.state_dict()
+                
+                print(f"Saving intermediate model for epoch {epoch+1}...")
+                save_model(f"{run_name}_intermediate_ep{epoch+1}_mIoU_{val_mIoU:.2f}", model.state_dict(), config)
+        except KeyboardInterrupt:
+            print("Training interrupted. Saving best model...")
         
         # Save best model as W&B artifact
         if best_model_state is not None:
-            artifact_name = f"{run_name}_mIoU_{best_val_mIoU:.2f}"
-            model_artifact = wandb.Artifact(artifact_name, type="model")
-            model_artifact.metadata = dict(config)
-
-            if not os.path.exists('checkpoints'):
-                os.makedirs('checkpoints')
-            model_path = f"checkpoints/{artifact_name}.pth"
-
-            torch.save(best_model_state, model_path)
-            model_artifact.add_file(model_path)
-            wandb.log_artifact(model_artifact)
+            artifact_name = f"{run_name}_final_mIoU_{best_val_mIoU:.2f}"
+            save_model(artifact_name, best_model_state, config)
             
     return
+
+def save_model(artifact_name, model_state, config):
+    model_artifact = wandb.Artifact(artifact_name, type="model")
+    model_artifact.metadata = dict(config)
+
+    if not os.path.exists('checkpoints'):
+        os.makedirs('checkpoints')
+    model_path = f"checkpoints/{artifact_name}.pth"
+
+    torch.save(model_state, model_path)
+    model_artifact.add_file(model_path)
+    wandb.log_artifact(model_artifact)
 
 def make(config):
     train, val = get_data(config, split="train"), get_data(config, split="val")
@@ -183,5 +207,20 @@ def validate(model, loader, criterion, config, epoch):
 
     return avg_mIoU
 
+def evaluate_model_size(config):
+    model = UNet(in_channels=3, num_classes=19, base_channels=config["base_channels"]).to(device)
+    model_size = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    model_size_mb = model_size * 4 / (1024 ** 2)  # Assuming 32-bit (4 bytes) precision
+    print(f"Model size with base_channels={config['base_channels']}: {model_size} trainable parameters")
+    print(f"Model size in MB: {model_size_mb:.2f} MB")
+    return model_size, model_size_mb
+
 if __name__ == "__main__":
-    model_pipeline(config)
+    # model_pipeline(config)
+
+    # Evaluate model size
+    evaluate_model_size(config)
+
+
+
+    

@@ -75,6 +75,12 @@ def map_trainId_to_label_name(trainId):
     trainId_to_name = {label.trainId: label.name for label in labels}
     return trainId_to_name.get(trainId, "Unknown")
 
+def map_trainId_to_color(trainId):
+    if trainId == 255 or trainId == -1:
+        return (0, 0, 0)  # Default color for ignored labels
+    trainId_to_color = {label.trainId: label.color for label in labels}
+    return trainId_to_color.get(trainId, (0, 0, 0))  # Default color if trainId is not found
+
 labels = [
     #       name                     id    trainId   category            catId     hasInstances   ignoreInEval   color
     Label(  'unlabeled'            ,  0 ,      255 , 'void'            , 0       , False        , True         , (  0,  0,  0) ),

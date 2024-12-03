@@ -6,7 +6,7 @@ import random
 from tqdm.auto import tqdm
 from models.unet import UNet
 from dataset import get_data, make_dataloader
-from utils import calculate_mIoU, log_sample
+from utils import calculate_mIoU, log_colored_sample
 
 # Set random seeds
 torch.backends.cudnn.deterministic = True
@@ -53,7 +53,7 @@ def evaluate_model(model, test_loader):
     total_mIoU = 0
     with torch.no_grad():
         pbar = tqdm(test_loader, desc="Evaluating")
-        for batch, sample in enumerate(pbar):
+        for batch, sample in enumerate(pbar):    
             inputs = sample["input_image"].permute(0, 3, 1, 2).to(device)
             input_names = sample["input_name"]
             labels = sample["target_image"].to(device)
@@ -63,26 +63,19 @@ def evaluate_model(model, test_loader):
 
             pbar.set_postfix({"mIoU": mIoU})
 
-            if mIoU < 0.5:
-                wandb.log({
-                    "test/batch_num": batch,
-                    "test/mIoU": mIoU,
-                })
-                log_sample(inputs[0], input_names[0], labels[0], outputs[0], split='test/lt0.5')
-            elif mIoU > 0.8:
-                wandb.log({
-                    "test/batch_num": batch,
-                    "test/mIoU": mIoU,
-                })
-                log_sample(inputs[0], input_names[0], labels[0], outputs[0], split='test/gt0.8')
+            wandb.log({
+                "test/batch_num": batch,
+                "test/mIoU": mIoU,
+            })
+            log_colored_sample(inputs[0], input_names[0], labels[0], outputs[0], split='test')
                 
     avg_mIoU = total_mIoU / len(test_loader)
     return avg_mIoU
 
 if __name__ == "__main__":
     # Replace with your artifact name
-    artifact_name = "UNet_ep_10_img_1024x2048_bs_2_channels_32_final_mIoU_0.72:v0"  
-    wandb.init(project="semantic-foggy-driving", name=artifact_name, job_type="test")
+    artifact_name = "DeepLabv3_ep_10_img_1024x2048_bs_2_channels_64_mIoU_0.48:v0"  
+    wandb.init(project="semantic-foggy-driving", name=artifact_name)
 
     # Load model and configuration
     model, config = load_model_and_config(artifact_name, UNet, device)
@@ -94,7 +87,10 @@ if __name__ == "__main__":
 
     # Load the test dataset
     test_data = get_data(config, split="test")
-    test_loader = make_dataloader(test_data, batch_size=1, shuffle=False)
+    filter_strings = ["lindau_000015_000019", "munster_000147_000019", "weimar_000005_000019"]
+    filtered_test_data = [sample for sample in test_data if any(s in sample["input_name"] for s in filter_strings)]
+    print(len(filtered_test_data))
+    test_loader = make_dataloader(filtered_test_data, batch_size=1, shuffle=False)
 
     # Evaluate and log the test mIoU
     avg_mIoU = evaluate_model(model, test_loader)
